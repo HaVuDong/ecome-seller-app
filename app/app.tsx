@@ -4,16 +4,16 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 
-import { LoginScreen } from '@/components/LoginScreen';
-import { RegisterScreen } from '@/components/RegisterScreen';
-import { Dashboard } from '@/components/Dashboard';
-import { ProductList } from '@/components/ProductList';
-import { AddProduct } from '@/components/AddProduct';
-import { EditProduct } from '@/components/EditProduct';
-import { OrdersList } from '@/components/OrdersList';
-import { OrderDetail } from '@/components/OrderDetail';
-import { Chat } from '@/components/Chat';
-import { Profile } from '@/components/Profile';
+import { LoginScreen } from '@/components/auth/LoginScreen';
+import { RegisterScreen } from '@/components/auth/RegisterScreen';
+import { Dashboard } from '@/components/dashboard/Dashboard';
+import { ProductList } from '@/components/products/ProductList';
+import { AddProduct } from '@/components/products/AddProduct';
+import { EditProduct } from '@/components/products/EditProduct';
+import { OrdersList } from '@/components/orders/OrdersList';
+import { OrderDetail } from '@/components/orders/OrderDetail';
+import { Chat } from '@/components/chat/Chat';
+import { Profile } from '@/components/profile/Profile';
 
 export type Screen = 
   | 'dang-nhap' 

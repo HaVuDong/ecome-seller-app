@@ -9,8 +9,8 @@ import Animated, {
   runOnUI,
   useDerivedValue,
 } from 'react-native-reanimated';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { ThemedText } from '@/components/shared/themed-text';
+import { ThemedView } from '@/components/shared/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';

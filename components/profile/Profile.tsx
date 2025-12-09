@@ -1,14 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
 
 interface ProfileProps {
   onLogout: () => void;
 }
 
 export function Profile({ onLogout }: ProfileProps) {
-  const navigation = useNavigation();
 
   const menuItems = [
     {

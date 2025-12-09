@@ -8,7 +8,8 @@ import {
   TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { RootStackParamList } from '../app/app';
 
 interface Order {
   id: string;
@@ -28,7 +29,7 @@ interface Order {
 }
 
 export function OrdersList() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
 
@@ -183,7 +184,7 @@ export function OrdersList() {
             <TouchableOpacity
               key={order.id}
               style={styles.orderCard}
-              onPress={() => navigation.navigate('OrderDetail' as never, { orderId: order.id } as never)}
+              onPress={() => navigation.navigate('OrderDetail', { orderId: order.id })}
             >
               <View style={styles.orderHeader}>
                 <View style={styles.orderHeaderLeft}>

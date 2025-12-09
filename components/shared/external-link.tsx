@@ -1,3 +1,4 @@
+/* eslint-disable import/no-duplicates */
 import React from 'react';
 import { Pressable } from 'react-native';
 import { Platform } from 'react-native';

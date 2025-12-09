@@ -1,10 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { RootStackParamList } from '../app/app';
 
 export function Dashboard() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
 
   const stats = [
     {
@@ -102,7 +103,7 @@ export function Dashboard() {
                 <TouchableOpacity
                   key={order.id}
                   style={[styles.orderItem, index < recentOrders.length - 1 && styles.orderBorder]}
-                  onPress={() => navigation.navigate('OrderDetail' as never, { orderId: order.id.replace('#', '') } as never)}
+                  onPress={() => navigation.navigate('OrderDetail', { orderId: order.id.replace('#', '') })}
                 >
                   <View style={styles.orderLeft}>
                     <Text style={styles.orderId}>{order.id}</Text>

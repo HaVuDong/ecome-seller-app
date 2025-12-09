@@ -10,11 +10,11 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import type { Product } from '../App';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
+import type { Product, RootStackParamList } from '../app/app';
 
 export function ProductList() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const [searchQuery, setSearchQuery] = useState('');
   
   const [products] = useState<Product[]>([
@@ -116,7 +116,7 @@ export function ProductList() {
             <View style={styles.productActions}>
               <TouchableOpacity
                 style={styles.actionButton}
-                onPress={() => navigation.navigate('EditProduct' as never, { productId: product.id } as never)}
+                onPress={() => navigation.navigate('EditProduct', { productId: product.id })}
               >
                 <Ionicons name="create-outline" size={20} color="#2563eb" />
               </TouchableOpacity>
