@@ -9,9 +9,10 @@ import {
   Image,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
-import type { Product, RootStackParamList } from '../app/app';
+import type { Product, RootStackParamList } from '@/app/app';
 
 export function ProductList() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -73,13 +74,14 @@ export function ProductList() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.title}>Sản Phẩm</Text>
-            <Text style={styles.subtitle}>{products.length} sản phẩm</Text>
-          </View>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <View style={styles.headerTop}>
+            <View>
+              <Text style={styles.title}>Sản Phẩm</Text>
+              <Text style={styles.subtitle}>{products.length} sản phẩm</Text>
+            </View>
           <TouchableOpacity
             style={styles.addButton}
             onPress={() => navigation.navigate('AddProduct' as never)}
@@ -130,11 +132,16 @@ export function ProductList() {
           </View>
         ))}
       </ScrollView>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f9fafb',

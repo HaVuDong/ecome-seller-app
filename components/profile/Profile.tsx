@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 interface ProfileProps {
@@ -37,12 +38,13 @@ export function Profile({ onLogout }: ProfileProps) {
   ];
 
   return (
-    <View style={styles.container}>
-      <ScrollView style={styles.scrollView}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Hồ sơ & Cài đặt</Text>
-        </View>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <View style={styles.container}>
+        <ScrollView style={styles.scrollView}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Hồ sơ & Cài đặt</Text>
+          </View>
 
         <View style={styles.content}>
           {/* Profile Card */}
@@ -121,11 +123,16 @@ export function Profile({ onLogout }: ProfileProps) {
           <Text style={styles.version}>Phiên bản 1.0.0</Text>
         </View>
       </ScrollView>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f9fafb',

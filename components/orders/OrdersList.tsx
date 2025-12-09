@@ -7,9 +7,10 @@ import {
   TouchableOpacity,
   TextInput,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
-import { RootStackParamList } from '../app/app';
+import { RootStackParamList } from '@/app/app';
 
 interface Order {
   id: string;
@@ -20,12 +21,12 @@ interface Order {
   status: string;
   total: number;
   date: string;
-  items: Array<{
+  items: {
     productId: string;
     productName: string;
     quantity: number;
     price: number;
-  }>;
+  }[];
 }
 
 export function OrdersList() {
@@ -130,11 +131,12 @@ export function OrdersList() {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Đơn hàng</Text>
-        <Text style={styles.headerSubtitle}>{orders.length} đơn hàng</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Đơn hàng</Text>
+          <Text style={styles.headerSubtitle}>{orders.length} đơn hàng</Text>
 
         {/* Search */}
         <View style={styles.searchContainer}>
@@ -215,11 +217,16 @@ export function OrdersList() {
           </View>
         )}
       </ScrollView>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f9fafb',

@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
-import { RootStackParamList } from '../app/app';
+import { RootStackParamList } from '@/app/app';
 
 export function Dashboard() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -65,11 +66,12 @@ export function Dashboard() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Bảng Điều Khiển</Text>
-        <Text style={styles.subtitle}>Chào mừng trở lại! Đây là tổng quan cửa hàng của bạn</Text>
-      </View>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <ScrollView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Bảng Điều Khiển</Text>
+          <Text style={styles.subtitle}>Chào mừng trở lại! Đây là tổng quan cửa hàng của bạn</Text>
+        </View>
 
       <View style={styles.content}>
         {/* Stats Grid */}
@@ -142,10 +144,15 @@ export function Dashboard() {
         </View>
       </View>
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f9fafb',
