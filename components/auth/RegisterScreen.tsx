@@ -8,26 +8,62 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function RegisterScreen() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
+    address: '',
     password: '',
     confirmPassword: '',
   });
+  const [isLoading, setIsLoading] = useState(false);
   const navigation = useNavigation();
+  const { register } = useAuth();
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = () => {
-    navigation.navigate('Main' as never);
+  const handleSubmit = async () => {
+    if (!formData.name || !formData.email || !formData.password || !formData.address) {
+      Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin (Địa chỉ là bắt buộc cho Seller)');
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      Alert.alert('Lỗi', 'Mật khẩu xác nhận không khớp');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      Alert.alert('Lỗi', 'Mật khẩu phải có ít nhất 6 ký tự');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await register({
+        email: formData.email,
+        password: formData.password,
+        fullName: formData.name,
+        phone: formData.phone,
+        address: formData.address,
+        role: 'SELLER',
+      });
+      navigation.navigate('Main' as never);
+    } catch (error: any) {
+      Alert.alert('Đăng ký thất bại', error.message || 'Không thể tạo tài khoản');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -92,6 +128,21 @@ export function RegisterScreen() {
             </View>
 
             <View style={styles.inputGroup}>
+              <Text style={styles.label}>Địa chỉ *</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="location-outline" size={20} color="#9ca3af" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Địa chỉ cửa hàng của bạn"
+                  value={formData.address}
+                  onChangeText={(value) => handleChange('address', value)}
+                  placeholderTextColor="#9ca3af"
+                  multiline
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
               <Text style={styles.label}>Mật Khẩu</Text>
               <View style={styles.inputContainer}>
                 <Ionicons name="lock-closed-outline" size={20} color="#9ca3af" style={styles.inputIcon} />
@@ -121,8 +172,16 @@ export function RegisterScreen() {
               </View>
             </View>
 
-            <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-              <Text style={styles.buttonText}>Đăng Ký</Text>
+            <TouchableOpacity 
+              style={[styles.button, isLoading && styles.buttonDisabled]} 
+              onPress={handleSubmit}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Text style={styles.buttonText}>Đăng Ký</Text>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -209,6 +268,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
     marginTop: 8,
   },
   buttonText: {
@@ -229,5 +291,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#2563eb',
     fontWeight: '500',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    backgroundColor: '#fef2f2',
+  },
+  logoutButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#dc2626',
   },
 });

@@ -8,18 +8,36 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const navigation = useNavigation();
+  const { login } = useAuth();
 
-  const handleSubmit = () => {
-    navigation.navigate('Main' as never);
+  const handleSubmit = async () => {
+    if (!email || !password) {
+      Alert.alert('Lỗi', 'Vui lòng nhập email và mật khẩu');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await login({ email, password });
+      navigation.navigate('Main' as never);
+    } catch (error: any) {
+      Alert.alert('Đăng nhập thất bại', error.message || 'Email hoặc mật khẩu không đúng');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -84,8 +102,16 @@ export function LoginScreen() {
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-              <Text style={styles.buttonText}>Đăng nhập</Text>
+            <TouchableOpacity 
+              style={[styles.button, isLoading && styles.buttonDisabled]} 
+              onPress={handleSubmit}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Text style={styles.buttonText}>Đăng nhập</Text>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -205,6 +231,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
     marginTop: 8,
   },
   buttonText: {
