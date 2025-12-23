@@ -3,6 +3,8 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
 import { LoginScreen } from '@/components/auth/LoginScreen';
 import { RegisterScreen } from '@/components/auth/RegisterScreen';
@@ -14,6 +16,7 @@ import { OrdersList } from '@/components/orders/OrdersList';
 import { OrderDetail } from '@/components/orders/OrderDetail';
 import { Chat } from '@/components/chat/Chat';
 import { Profile } from '@/components/profile/Profile';
+import { useAuth } from '@/contexts/AuthContext';
 
 export type Screen = 
   | 'dang-nhap' 
@@ -66,6 +69,41 @@ export type RootStackParamList = {
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
 
+function ProfileTabScreen() {
+  const navigation = useNavigation();
+  const { logout } = useAuth();
+
+  const handleLogout = async () => {
+    Alert.alert(
+      'Đăng xuất',
+      'Bạn có chắc chắn muốn đăng xuất?',
+      [
+        {
+          text: 'Hủy',
+          style: 'cancel',
+        },
+        {
+          text: 'Đăng xuất',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Login' as never }],
+              });
+            } catch (error) {
+              console.error('Logout error:', error);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  return <Profile onLogout={handleLogout} />;
+}
+
 function MainTabs() {
   return (
     <Tab.Navigator
@@ -79,6 +117,7 @@ function MainTabs() {
           paddingBottom: 5,
           paddingTop: 5,
           height: 60,
+          marginBottom: 40,
         },
         headerShown: false,
       }}
@@ -125,15 +164,14 @@ function MainTabs() {
       />
       <Tab.Screen
         name="ProfileTab"
+        component={ProfileTabScreen}
         options={{
           tabBarLabel: 'Hồ sơ',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
           ),
         }}
-      >
-        {() => <Profile onLogout={() => {}} />}
-      </Tab.Screen>
+      />
     </Tab.Navigator>
   );
 }

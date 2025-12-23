@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
 
 interface ChatRoom {
   id: string;
@@ -30,7 +29,6 @@ interface Message {
 }
 
 export function Chat() {
-  const navigation = useNavigation();
   const [selectedChat, setSelectedChat] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [messageInput, setMessageInput] = useState('');
@@ -182,7 +180,7 @@ export function Chat() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -275,6 +273,7 @@ const styles = StyleSheet.create({
   },
   chatList: {
     flex: 1,
+    paddingBottom: 16,
   },
   chatItem: {
     flexDirection: 'row',

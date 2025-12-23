@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,31 +9,82 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
+import { useAuth } from '@/contexts/AuthContext';
+import categoryService, { CategoryResponse } from '@/services/categoryService';
+import productService from '@/services/productService';
 
 export function AddProduct() {
   const navigation = useNavigation();
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     price: '',
-    category: '',
+    categoryId: '',
     description: '',
     stock: '',
   });
-
+  const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [images, setImages] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCategoriesLoading, setIsCategoriesLoading] = useState(true);
+
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const loadCategories = async () => {
+    try {
+      setIsCategoriesLoading(true);
+      const data = await categoryService.getAllCategories();
+      setCategories(data);
+    } catch (error: any) {
+      Alert.alert('Lỗi', 'Không thể tải danh mục');
+    } finally {
+      setIsCategoriesLoading(false);
+    }
+  };
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = () => {
-    // Handle product creation
-    navigation.goBack();
+  const handleSubmit = async () => {
+    if (!formData.name || !formData.price || !formData.categoryId || !formData.stock) {
+      Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin');
+      return;
+    }
+
+    if (!user) {
+      Alert.alert('Lỗi', 'Bạn cần đăng nhập để thêm sản phẩm');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await productService.createProduct({
+        sellerId: user.id,
+        categoryId: parseInt(formData.categoryId),
+        name: formData.name,
+        description: formData.description,
+        price: parseFloat(formData.price),
+        stock: parseInt(formData.stock),
+        mainImage: images[0] || '',
+        isActive: true,
+      });
+      Alert.alert('Thành công', 'Đã thêm sản phẩm mới');
+      navigation.goBack();
+    } catch (error: any) {
+      Alert.alert('Lỗi', error.message || 'Không thể thêm sản phẩm');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleImageUpload = () => {
@@ -125,19 +176,20 @@ export function AddProduct() {
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Danh Mục</Text>
             <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={formData.category}
-                onValueChange={(value) => handleChange('category', value)}
-                style={styles.picker}
-              >
-                <Picker.Item label="Chọn danh mục" value="" />
-                <Picker.Item label="Điện Tử" value="electronics" />
-                <Picker.Item label="Thời Trang" value="clothing" />
-                <Picker.Item label="Phụ Kiện" value="accessories" />
-                <Picker.Item label="Giày Dép" value="footwear" />
-                <Picker.Item label="Nhà Cửa & Đời Sống" value="home" />
-                <Picker.Item label="Thể Thao" value="sports" />
-              </Picker>
+              {isCategoriesLoading ? (
+                <ActivityIndicator style={{ padding: 15 }} />
+              ) : (
+                <Picker
+                  selectedValue={formData.categoryId}
+                  onValueChange={(value) => handleChange('categoryId', value)}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Chọn danh mục" value="" />
+                  {categories.map((cat) => (
+                    <Picker.Item key={cat.id} label={cat.name} value={cat.id.toString()} />
+                  ))}
+                </Picker>
+              )}
             </View>
           </View>
 
@@ -163,8 +215,16 @@ export function AddProduct() {
           >
             <Text style={styles.cancelButtonText}>Hủy</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-            <Text style={styles.submitButtonText}>Thêm Sản Phẩm</Text>
+          <TouchableOpacity 
+            style={[styles.submitButton, isLoading && styles.buttonDisabled]} 
+            onPress={handleSubmit}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.submitButtonText}>Thêm Sản Phẩm</Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -327,6 +387,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   submitButtonText: {
     fontSize: 16,

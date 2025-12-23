@@ -1,19 +1,47 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '@/contexts/AuthContext';
+import { UserStats } from '@/services/userService';
+import { EditProfile } from './EditProfile';
+import { useNavigation } from '@react-navigation/native';
 
 interface ProfileProps {
   onLogout: () => void;
 }
 
 export function Profile({ onLogout }: ProfileProps) {
+  const { user: authUser, refreshUser, logout } = useAuth();
+  const navigation = useNavigation();
+  const [stats] = useState<UserStats>({ totalOrders: 0, totalProducts: 0, averageRating: 0 });
+  const [isLoading, setIsLoading] = useState(true);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        setIsLoading(true);
+        await refreshUser();
+        // TODO: Load stats khi backend có API
+        // const userStats = await userService.getUserStats(authUser?.id || 0);
+        // setStats(userStats);
+      } catch (error: any) {
+        console.error('Error loading user data:', error);
+        Alert.alert('Lỗi', 'Không thể tải thông tin người dùng');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadUserData();
+  }, []);
 
   const menuItems = [
     {
       icon: 'person-outline' as const,
       label: 'Chỉnh sửa Hồ sơ',
-      onPress: () => {},
+      onPress: () => setShowEditProfile(true),
     },
     {
       icon: 'storefront-outline' as const,
@@ -37,8 +65,25 @@ export function Profile({ onLogout }: ProfileProps) {
     },
   ];
 
+  // Show EditProfile screen
+  if (showEditProfile) {
+    return (
+      <EditProfile
+        onBack={() => setShowEditProfile(false)}
+        onSave={async () => {
+          setShowEditProfile(false);
+          try {
+            await refreshUser();
+          } catch (error) {
+            console.error('Error refreshing user:', error);
+          }
+        }}
+      />
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.container}>
         <ScrollView style={styles.scrollView}>
           {/* Header */}
@@ -47,51 +92,62 @@ export function Profile({ onLogout }: ProfileProps) {
           </View>
 
         <View style={styles.content}>
-          {/* Profile Card */}
-          <View style={styles.card}>
-            <View style={styles.profileSection}>
-              <View style={styles.avatarContainer}>
-                <Text style={styles.avatarText}>JD</Text>
-              </View>
-              <View style={styles.profileInfo}>
-                <Text style={styles.profileName}>John Doe</Text>
-                <Text style={styles.profileId}>Mã người bán: #12345</Text>
-              </View>
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#10b981" />
+              <Text style={styles.loadingText}>Đang tải...</Text>
             </View>
+          ) : (
+            <>
+              {/* Profile Card */}
+              <View style={styles.card}>
+                <View style={styles.profileSection}>
+                  <View style={styles.avatarContainer}>
+                    <Text style={styles.avatarText}>
+                      {authUser?.fullName?.charAt(0).toUpperCase() || 'U'}
+                    </Text>
+                  </View>
+                  <View style={styles.profileInfo}>
+                    <Text style={styles.profileName}>{authUser?.fullName || 'Người dùng'}</Text>
+                    <Text style={styles.profileId}>ID: #{authUser?.id || '---'}</Text>
+                  </View>
+                </View>
 
-            <View style={styles.divider} />
+                <View style={styles.divider} />
 
-            <View style={styles.contactInfo}>
-              <View style={styles.contactItem}>
-                <Ionicons name="mail-outline" size={20} color="#6b7280" />
-                <Text style={styles.contactText}>john.doe@example.com</Text>
+                <View style={styles.contactInfo}>
+                  <View style={styles.contactItem}>
+                    <Ionicons name="mail-outline" size={20} color="#6b7280" />
+                    <Text style={styles.contactText}>{authUser?.email || 'Chưa có email'}</Text>
+                  </View>
+                  <View style={styles.contactItem}>
+                    <Ionicons name="call-outline" size={20} color="#6b7280" />
+                    <Text style={styles.contactText}>{authUser?.phone || 'Chưa có số điện thoại'}</Text>
+                  </View>
+                  <View style={styles.contactItem}>
+                    <Ionicons name="location-outline" size={20} color="#6b7280" />
+                    <Text style={styles.contactText}>{authUser?.address || 'Chưa có địa chỉ'}</Text>
+                  </View>
+                </View>
               </View>
-              <View style={styles.contactItem}>
-                <Ionicons name="call-outline" size={20} color="#6b7280" />
-                <Text style={styles.contactText}>+1 (555) 123-4567</Text>
-              </View>
-              <View style={styles.contactItem}>
-                <Ionicons name="location-outline" size={20} color="#6b7280" />
-                <Text style={styles.contactText}>New York, USA</Text>
-              </View>
-            </View>
-          </View>
 
-          {/* Stats */}
-          <View style={styles.statsContainer}>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>156</Text>
-              <Text style={styles.statLabel}>Đơn hàng</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>48</Text>
-              <Text style={styles.statLabel}>Sản phẩm</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>4.8</Text>
-              <Text style={styles.statLabel}>Đánh giá</Text>
-            </View>
-          </View>
+              {/* Stats */}
+              <View style={styles.statsContainer}>
+                <View style={styles.statCard}>
+                  <Text style={styles.statValue}>{stats.totalOrders}</Text>
+                  <Text style={styles.statLabel}>Đơn hàng</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statValue}>{stats.totalProducts}</Text>
+                  <Text style={styles.statLabel}>Sản phẩm</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statValue}>{stats.averageRating.toFixed(1)}</Text>
+                  <Text style={styles.statLabel}>Đánh giá</Text>
+                </View>
+              </View>
+            </>
+          )}
 
           {/* Menu Items */}
           <View style={styles.card}>
@@ -114,8 +170,17 @@ export function Profile({ onLogout }: ProfileProps) {
           </View>
 
           {/* Logout */}
-          <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
-            <Ionicons name="log-out-outline" size={20} color="#dc2626" />
+          <TouchableOpacity 
+            style={styles.logoutButton}
+            onPress={async () => {
+              await logout();
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Login' as never }],
+              });
+            }}
+          >
+            <Ionicons name="log-out-outline" size={20} color="#2f2929ff" />
             <Text style={styles.logoutText}>Đăng xuất</Text>
           </TouchableOpacity>
 
@@ -139,6 +204,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    paddingBottom: 16,
   },
   header: {
     backgroundColor: '#ffffff',
@@ -278,5 +344,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#9ca3af',
     marginBottom: 16,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6b7280',
   },
 });

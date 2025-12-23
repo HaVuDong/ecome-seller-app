@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,14 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
+import orderService, { OrderResponse } from '@/services/orderService';
 
 interface OrderDetailProps {
   route: {
@@ -23,40 +26,46 @@ interface OrderDetailProps {
 export function OrderDetail({ route }: OrderDetailProps) {
   const navigation = useNavigation();
   const { orderId } = route.params;
-  const [orderStatus, setOrderStatus] = useState('processing');
+  const [order, setOrder] = useState<OrderResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [orderStatus, setOrderStatus] = useState('');
 
-  // Mock order data - in real app, would fetch by orderId
-  const order = {
-    id: orderId,
-    customerName: 'John Smith',
-    customerEmail: 'john@example.com',
-    customerPhone: '+1 555-0001',
-    customerAddress: '123 Main St, Apt 4B, New York, NY 10001',
-    status: orderStatus,
-    total: 125.0,
-    subtotal: 115.0,
-    shipping: 10.0,
-    date: '2025-12-02 10:30 AM',
-    items: [
-      {
-        id: '1',
-        name: 'Wireless Headphones',
-        quantity: 1,
-        price: 89.99,
-        image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=100&h=100&fit=crop',
-      },
-      {
-        id: '2',
-        name: 'Phone Case',
-        quantity: 1,
-        price: 25.01,
-        image: 'https://images.unsplash.com/photo-1601784551446-20c9e07cdbdb?w=100&h=100&fit=crop',
-      },
-    ],
+  useEffect(() => {
+    loadOrderDetail();
+  }, [orderId]);
+
+  const loadOrderDetail = async () => {
+    try {
+      setIsLoading(true);
+      const data = await orderService.getOrderById(Number(orderId));
+      setOrder(data);
+      setOrderStatus(data.status);
+    } catch (error: any) {
+      console.error('Error loading order detail:', error);
+      Alert.alert('Lỗi', 'Không thể tải chi tiết đơn hàng');
+      navigation.goBack();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!order) return;
+    
+    try {
+      await orderService.updateOrderStatus(order.id, newStatus);
+      setOrderStatus(newStatus);
+      Alert.alert('Thành công', 'Đã cập nhật trạng thái đơn hàng');
+      loadOrderDetail();
+    } catch (error: any) {
+      console.error('Error updating status:', error);
+      Alert.alert('Lỗi', 'Không thể cập nhật trạng thái');
+    }
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    const statusLower = status?.toLowerCase() || '';
+    switch (statusLower) {
       case 'pending':
         return { bg: '#fef3c7', text: '#92400e' };
       case 'processing':
@@ -72,7 +81,31 @@ export function OrderDetail({ route }: OrderDetailProps) {
     }
   };
 
-  const statusColor = getStatusColor(order.status);
+  const getStatusLabel = (status: string) => {
+    const statusLower = status?.toLowerCase() || '';
+    switch (statusLower) {
+      case 'pending': return 'Chờ xử lý';
+      case 'processing': return 'Đang xử lý';
+      case 'shipped': return 'Đã gửi';
+      case 'delivered': return 'Đã giao';
+      case 'cancelled': return 'Đã hủy';
+      default: return status;
+    }
+  };
+
+  if (isLoading || !order) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={[styles.container, styles.centerContent]}>
+          <ActivityIndicator size="large" color="#10b981" />
+          <Text style={styles.loadingText}>Đang tải chi tiết...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const statusColor = getStatusColor(orderStatus);
+  const totalItems = order.orderItems?.reduce((sum, item) => sum + item.quantity, 0) || 0;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -84,12 +117,14 @@ export function OrderDetail({ route }: OrderDetailProps) {
               <Ionicons name="arrow-back" size={24} color="#111827" />
             </TouchableOpacity>
             <View style={styles.headerInfo}>
-              <Text style={styles.headerTitle}>Đơn hàng #{order.id}</Text>
-              <Text style={styles.headerDate}>{order.date}</Text>
+              <Text style={styles.headerTitle}>Đơn hàng #{order.orderNumber || order.id}</Text>
+              <Text style={styles.headerDate}>
+                {new Date(order.createdAt).toLocaleString('vi-VN')}
+              </Text>
             </View>
           <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
             <Text style={[styles.statusBadgeText, { color: statusColor.text }]}>
-              {order.status}
+              {getStatusLabel(orderStatus)}
             </Text>
           </View>
         </View>
@@ -102,21 +137,19 @@ export function OrderDetail({ route }: OrderDetailProps) {
           <View style={styles.customerInfo}>
             <View style={styles.customerHeader}>
               <View style={styles.customerAvatar}>
-                <Text style={styles.customerAvatarText}>JS</Text>
+                <Text style={styles.customerAvatarText}>
+                  {order.user?.fullName?.charAt(0).toUpperCase() || 'U'}
+                </Text>
               </View>
               <View style={styles.customerDetails}>
-                <Text style={styles.customerName}>{order.customerName}</Text>
+                <Text style={styles.customerName}>{order.user?.fullName || 'Khách hàng'}</Text>
                 <View style={styles.contactItem}>
                   <Ionicons name="mail-outline" size={16} color="#6b7280" />
-                  <Text style={styles.contactText}>{order.customerEmail}</Text>
-                </View>
-                <View style={styles.contactItem}>
-                  <Ionicons name="call-outline" size={16} color="#6b7280" />
-                  <Text style={styles.contactText}>{order.customerPhone}</Text>
+                  <Text style={styles.contactText}>{order.user?.email || 'N/A'}</Text>
                 </View>
                 <View style={styles.contactItem}>
                   <Ionicons name="location-outline" size={16} color="#6b7280" />
-                  <Text style={styles.contactText}>{order.customerAddress}</Text>
+                  <Text style={styles.contactText}>{order.shippingAddress || 'Chưa có địa chỉ'}</Text>
                 </View>
               </View>
             </View>
@@ -125,15 +158,17 @@ export function OrderDetail({ route }: OrderDetailProps) {
 
         {/* Order Items */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Sản phẩm đặt hàng</Text>
-          {order.items.map((item) => (
+          <Text style={styles.cardTitle}>Sản phẩm đặt hàng ({totalItems} sản phẩm)</Text>
+          {order.orderItems?.map((item) => (
             <View key={item.id} style={styles.orderItem}>
-              <Image source={{ uri: item.image }} style={styles.itemImage} />
+              {item.product?.mainImage && (
+                <Image source={{ uri: item.product.mainImage }} style={styles.itemImage} />
+              )}
               <View style={styles.itemDetails}>
-                <Text style={styles.itemName}>{item.name}</Text>
+                <Text style={styles.itemName}>{item.product?.name || 'Sản phẩm'}</Text>
                 <Text style={styles.itemQuantity}>SL: {item.quantity}</Text>
               </View>
-              <Text style={styles.itemPrice}>${item.price.toFixed(2)}</Text>
+              <Text style={styles.itemPrice}>{item.price.toLocaleString('vi-VN')} đ</Text>
             </View>
           ))}
 
@@ -141,16 +176,16 @@ export function OrderDetail({ route }: OrderDetailProps) {
 
           <View style={styles.priceBreakdown}>
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Tạm tính</Text>
-              <Text style={styles.priceValue}>${order.subtotal.toFixed(2)}</Text>
+              <Text style={styles.priceLabel}>Phương thức thanh toán</Text>
+              <Text style={styles.priceValue}>{order.paymentMethod || 'N/A'}</Text>
             </View>
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Phí vận chuyển</Text>
-              <Text style={styles.priceValue}>${order.shipping.toFixed(2)}</Text>
+              <Text style={styles.priceLabel}>Trạng thái thanh toán</Text>
+              <Text style={styles.priceValue}>{order.paymentStatus || 'N/A'}</Text>
             </View>
             <View style={[styles.priceRow, styles.totalRow]}>
               <Text style={styles.totalLabel}>Tổng cộng</Text>
-              <Text style={styles.totalValue}>${order.total.toFixed(2)}</Text>
+              <Text style={styles.totalValue}>{order.totalAmount.toLocaleString('vi-VN')} đ</Text>
             </View>
           </View>
         </View>
@@ -161,19 +196,16 @@ export function OrderDetail({ route }: OrderDetailProps) {
           <View style={styles.pickerContainer}>
             <Picker
               selectedValue={orderStatus}
-              onValueChange={(itemValue) => setOrderStatus(itemValue)}
+              onValueChange={(itemValue) => handleStatusChange(itemValue)}
               style={styles.picker}
             >
-              <Picker.Item label="Chờ xử lý" value="pending" />
-              <Picker.Item label="Đang xử lý" value="processing" />
-              <Picker.Item label="Đã gửi hàng" value="shipped" />
-              <Picker.Item label="Đã giao hàng" value="delivered" />
-              <Picker.Item label="Đã hủy" value="cancelled" />
+              <Picker.Item label="Chờ xử lý" value="PENDING" />
+              <Picker.Item label="Đang xử lý" value="PROCESSING" />
+              <Picker.Item label="Đã gửi hàng" value="SHIPPED" />
+              <Picker.Item label="Đã giao hàng" value="DELIVERED" />
+              <Picker.Item label="Đã hủy" value="CANCELLED" />
             </Picker>
           </View>
-          <TouchableOpacity style={styles.updateButton}>
-            <Text style={styles.updateButtonText}>Cập nhật trạng thái</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Actions */}
@@ -375,17 +407,6 @@ const styles = StyleSheet.create({
   picker: {
     height: 50,
   },
-  updateButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  updateButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
   actionsContainer: {
     flexDirection: 'row',
     gap: 12,
@@ -404,5 +425,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#111827',
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6b7280',
   },
 });

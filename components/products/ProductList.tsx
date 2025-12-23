@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,73 +8,93 @@ import {
   TouchableOpacity,
   Image,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, NavigationProp } from '@react-navigation/native';
-import type { Product, RootStackParamList } from '@/app/app';
+import { useNavigation, NavigationProp, useFocusEffect } from '@react-navigation/native';
+import type { RootStackParamList } from '@/app/app';
+import productService, { ProductResponse } from '@/services/productService';
 
 export function ProductList() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const [searchQuery, setSearchQuery] = useState('');
-  
-  const [products] = useState<Product[]>([
-    {
-      id: '1',
-      name: 'Tai Nghe Không Dây',
-      price: 89.99,
-      category: 'Điện Tử',
-      image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
-      description: 'Tai nghe không dây cao cấp với khử tiếng ồn',
-      stock: 45,
-    },
-    {
-      id: '2',
-      name: 'Đồng Hồ Thông Minh',
-      price: 199.99,
-      category: 'Điện Tử',
-      image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop',
-      description: 'Đồng hồ thông minh theo dõi sức khỏe',
-      stock: 23,
-    },
-    {
-      id: '3',
-      name: 'Ba Lô Da',
-      price: 129.99,
-      category: 'Phụ Kiện',
-      image: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&h=400&fit=crop',
-      description: 'Ba lô da cao cấp cho doanh nhân',
-      stock: 12,
-    },
-    {
-      id: '4',
-      name: 'Giày Chạy Bộ',
-      price: 119.99,
-      category: 'Giày Dép',
-      image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=400&fit=crop',
-      description: 'Giày chạy bộ thoải mái cho vận động viên',
-      stock: 67,
-    },
-  ]);
+  const [products, setProducts] = useState<ProductResponse[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.category.toLowerCase().includes(searchQuery.toLowerCase())
+  const loadProducts = async () => {
+    try {
+      setIsLoading(true);
+      const response = await productService.getAllProducts(0, 100);
+      setProducts(response.content);
+    } catch (error: any) {
+      Alert.alert('Lỗi', error.message || 'Không thể tải danh sách sản phẩm');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadProducts();
+    }, [])
   );
 
-  const handleDelete = (productId: string) => {
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      loadProducts();
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      const response = await productService.searchProducts(searchQuery, 0, 100);
+      setProducts(response.content);
+    } catch (error: any) {
+      Alert.alert('Lỗi', 'Không thể tìm kiếm sản phẩm');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      handleSearch();
+    }, 500);
+
+    return () => clearTimeout(delayDebounce);
+  }, [searchQuery]);
+
+  const handleDelete = (productId: number) => {
     Alert.alert(
       'Xóa Sản Phẩm',
       'Bạn có chắc chắn muốn xóa sản phẩm này?',
       [
         { text: 'Hủy', style: 'cancel' },
-        { text: 'Xóa', style: 'destructive', onPress: () => {} },
+        { 
+          text: 'Xóa', 
+          style: 'destructive', 
+          onPress: async () => {
+            try {
+              await productService.deleteProduct(productId);
+              Alert.alert('Thành công', 'Đã xóa sản phẩm');
+              loadProducts();
+            } catch (error: any) {
+              Alert.alert('Lỗi', error.message || 'Không thể xóa sản phẩm');
+            }
+          }
+        },
       ]
     );
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.container}>
         <View style={styles.header}>
           <View style={styles.headerTop}>
@@ -104,33 +124,49 @@ export function ProductList() {
       </View>
 
       <ScrollView style={styles.productsList} contentContainerStyle={styles.productsContent}>
-        {filteredProducts.map((product) => (
-          <View key={product.id} style={styles.productCard}>
-            <Image source={{ uri: product.image }} style={styles.productImage} />
-            <View style={styles.productInfo}>
-              <Text style={styles.productName}>{product.name}</Text>
-              <Text style={styles.productCategory}>{product.category}</Text>
-              <View style={styles.productFooter}>
-                <Text style={styles.productPrice}>${product.price.toFixed(2)}</Text>
-                <Text style={styles.productStock}>Kho: {product.stock}</Text>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#2563eb" />
+            <Text style={styles.loadingText}>Đang tải sản phẩm...</Text>
+          </View>
+        ) : products.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="cube-outline" size={64} color="#d1d5db" />
+            <Text style={styles.emptyText}>Không có sản phẩm nào</Text>
+            <Text style={styles.emptySubtext}>Thêm sản phẩm đầu tiên của bạn</Text>
+          </View>
+        ) : (
+          products.map((product) => (
+            <View key={product.id} style={styles.productCard}>
+              <Image 
+                source={{ uri: product.mainImage || 'https://via.placeholder.com/80' }} 
+                style={styles.productImage} 
+              />
+              <View style={styles.productInfo}>
+                <Text style={styles.productName}>{product.name}</Text>
+                <Text style={styles.productCategory}>{product.category.name}</Text>
+                <View style={styles.productFooter}>
+                  <Text style={styles.productPrice}>${product.price.toFixed(2)}</Text>
+                  <Text style={styles.productStock}>Kho: {product.stock}</Text>
+                </View>
+              </View>
+              <View style={styles.productActions}>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => navigation.navigate('EditProduct', { productId: product.id.toString() })}
+                >
+                  <Ionicons name="create-outline" size={20} color="#2563eb" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => handleDelete(product.id)}
+                >
+                  <Ionicons name="trash-outline" size={20} color="#dc2626" />
+                </TouchableOpacity>
               </View>
             </View>
-            <View style={styles.productActions}>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => navigation.navigate('EditProduct', { productId: product.id })}
-              >
-                <Ionicons name="create-outline" size={20} color="#2563eb" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => handleDelete(product.id)}
-              >
-                <Ionicons name="trash-outline" size={20} color="#dc2626" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
+          ))
+        )}
       </ScrollView>
       </View>
     </SafeAreaView>
@@ -207,6 +243,7 @@ const styles = StyleSheet.create({
   productsContent: {
     padding: 24,
     gap: 16,
+    paddingBottom: 24,
   },
   productCard: {
     backgroundColor: '#ffffff',
@@ -256,5 +293,33 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     padding: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#374151',
+    marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#9ca3af',
+    marginTop: 8,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,110 +6,61 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '@/app/app';
-
-interface Order {
-  id: string;
-  customerName: string;
-  customerEmail: string;
-  customerPhone: string;
-  customerAddress: string;
-  status: string;
-  total: number;
-  date: string;
-  items: {
-    productId: string;
-    productName: string;
-    quantity: number;
-    price: number;
-  }[];
-}
+import orderService, { OrderResponse } from '@/services/orderService';
 
 export function OrdersList() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
+  const [orders, setOrders] = useState<OrderResponse[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const orders: Order[] = [
-    {
-      id: 'ORD-001',
-      customerName: 'John Smith',
-      customerEmail: 'john@example.com',
-      customerPhone: '+1 555-0001',
-      customerAddress: '123 Main St, New York, NY 10001',
-      status: 'pending',
-      total: 125.0,
-      date: '2025-12-02',
-      items: [
-        { productId: '1', productName: 'Wireless Headphones', quantity: 1, price: 89.99 },
-        { productId: '2', productName: 'Phone Case', quantity: 1, price: 35.01 },
-      ],
-    },
-    {
-      id: 'ORD-002',
-      customerName: 'Sarah Johnson',
-      customerEmail: 'sarah@example.com',
-      customerPhone: '+1 555-0002',
-      customerAddress: '456 Oak Ave, Los Angeles, CA 90001',
-      status: 'processing',
-      total: 89.5,
-      date: '2025-12-01',
-      items: [{ productId: '3', productName: 'Leather Backpack', quantity: 1, price: 89.5 }],
-    },
-    {
-      id: 'ORD-003',
-      customerName: 'Mike Davis',
-      customerEmail: 'mike@example.com',
-      customerPhone: '+1 555-0003',
-      customerAddress: '789 Pine Rd, Chicago, IL 60601',
-      status: 'shipped',
-      total: 245.0,
-      date: '2025-11-30',
-      items: [
-        { productId: '2', productName: 'Smart Watch', quantity: 1, price: 199.99 },
-        { productId: '4', productName: 'Screen Protector', quantity: 1, price: 45.01 },
-      ],
-    },
-    {
-      id: 'ORD-004',
-      customerName: 'Emily Brown',
-      customerEmail: 'emily@example.com',
-      customerPhone: '+1 555-0004',
-      customerAddress: '321 Elm St, Houston, TX 77001',
-      status: 'delivered',
-      total: 67.25,
-      date: '2025-11-29',
-      items: [{ productId: '5', productName: 'USB Cable', quantity: 3, price: 67.25 }],
-    },
-    {
-      id: 'ORD-005',
-      customerName: 'David Wilson',
-      customerEmail: 'david@example.com',
-      customerPhone: '+1 555-0005',
-      customerAddress: '654 Maple Dr, Phoenix, AZ 85001',
-      status: 'cancelled',
-      total: 159.99,
-      date: '2025-11-28',
-      items: [{ productId: '6', productName: 'Bluetooth Speaker', quantity: 1, price: 159.99 }],
-    },
-  ];
+  useEffect(() => {
+    loadOrders();
+  }, []);
+
+  const loadOrders = async () => {
+    try {
+      setIsLoading(true);
+      const response = await orderService.getAllOrders(0, 100);
+      setOrders(response.content);
+    } catch (error: any) {
+      console.error('Error loading orders:', error);
+      Alert.alert('Lỗi', 'Không thể tải danh sách đơn hàng');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadOrders();
+    setRefreshing(false);
+  };
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
-      order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customerName.toLowerCase().includes(searchQuery.toLowerCase());
+      order.orderNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.user?.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.user?.email?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesTab = activeTab === 'all' || order.status === activeTab;
+    const matchesTab = activeTab === 'all' || order.status.toLowerCase() === activeTab.toLowerCase();
 
     return matchesSearch && matchesTab;
   });
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    const statusLower = status.toLowerCase();
+    switch (statusLower) {
       case 'pending':
         return { bg: '#fef3c7', text: '#92400e' };
       case 'processing':
@@ -127,11 +78,34 @@ export function OrdersList() {
 
   const getStatusCount = (status: string) => {
     if (status === 'all') return orders.length;
-    return orders.filter((o) => o.status === status).length;
+    return orders.filter((o) => o.status.toLowerCase() === status.toLowerCase()).length;
   };
 
+  const getStatusLabel = (status: string) => {
+    const statusLower = status.toLowerCase();
+    switch (statusLower) {
+      case 'pending': return 'Chờ xử lý';
+      case 'processing': return 'Đang xử lý';
+      case 'shipped': return 'Đã gửi';
+      case 'delivered': return 'Đã giao';
+      case 'cancelled': return 'Đã hủy';
+      default: return status;
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <View style={[styles.container, styles.centerContent]}>
+          <ActivityIndicator size="large" color="#10b981" />
+          <Text style={styles.loadingText}>Đang tải đơn hàng...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -179,42 +153,67 @@ export function OrdersList() {
       </View>
 
       {/* Orders List */}
-      <ScrollView style={styles.ordersList} contentContainerStyle={styles.ordersContent}>
-        {filteredOrders.map((order) => {
-          const statusColor = getStatusColor(order.status);
-          return (
-            <TouchableOpacity
-              key={order.id}
-              style={styles.orderCard}
-              onPress={() => navigation.navigate('OrderDetail', { orderId: order.id })}
-            >
-              <View style={styles.orderHeader}>
-                <View style={styles.orderHeaderLeft}>
-                  <Text style={styles.orderId}>{order.id}</Text>
-                  <Text style={styles.orderCustomer}>{order.customerName}</Text>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
-                  <Text style={[styles.statusBadgeText, { color: statusColor.text }]}>
-                    {order.status === 'pending' ? 'Chờ xử lý' : 
-                     order.status === 'processing' ? 'Đang xử lý' : 
-                     order.status === 'shipped' ? 'Đã gửi' : 
-                     order.status === 'delivered' ? 'Đã giao' : 
-                     order.status === 'cancelled' ? 'Đã hủy' : order.status}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.orderFooter}>
-                <Text style={styles.orderDate}>{order.date}</Text>
-                <Text style={styles.orderTotal}>${order.total.toFixed(2)}</Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-
-        {filteredOrders.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>Không tìm thấy đơn hàng</Text>
+      <ScrollView 
+        style={styles.ordersList} 
+        contentContainerStyle={styles.ordersContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#10b981']} />
+        }
+      >
+        {filteredOrders.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="receipt-outline" size={64} color="#d1d5db" />
+            <Text style={styles.emptyText}>Không có đơn hàng nào</Text>
           </View>
+        ) : (
+          filteredOrders.map((order) => {
+            const statusColor = getStatusColor(order.status);
+            const totalItems = order.orderItems?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+            
+            return (
+              <TouchableOpacity
+                key={order.id}
+                style={styles.orderCard}
+                onPress={() => navigation.navigate('OrderDetail', { orderId: order.id.toString() })}
+              >
+                <View style={styles.orderHeader}>
+                  <View style={styles.orderHeaderLeft}>
+                    <Text style={styles.orderId}>#{order.orderNumber || order.id}</Text>
+                    <Text style={styles.orderCustomer}>{order.user?.fullName || 'Khách hàng'}</Text>
+                  </View>
+                  <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
+                    <Text style={[styles.statusBadgeText, { color: statusColor.text }]}>
+                      {getStatusLabel(order.status)}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.orderDetails}>
+                  <View style={styles.orderDetailRow}>
+                    <Ionicons name="mail-outline" size={16} color="#6b7280" />
+                    <Text style={styles.orderDetailText}>{order.user?.email || 'N/A'}</Text>
+                  </View>
+                  <View style={styles.orderDetailRow}>
+                    <Ionicons name="cube-outline" size={16} color="#6b7280" />
+                    <Text style={styles.orderDetailText}>{totalItems} sản phẩm</Text>
+                  </View>
+                  <View style={styles.orderDetailRow}>
+                    <Ionicons name="calendar-outline" size={16} color="#6b7280" />
+                    <Text style={styles.orderDetailText}>
+                      {new Date(order.createdAt).toLocaleDateString('vi-VN')}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.orderFooter}>
+                  <Text style={styles.orderTotal}>
+                    {order.totalAmount.toLocaleString('vi-VN')} đ
+                  </Text>
+                  <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+                </View>
+              </TouchableOpacity>
+            );
+          })
         )}
       </ScrollView>
       </View>
@@ -293,6 +292,7 @@ const styles = StyleSheet.create({
   },
   ordersContent: {
     padding: 16,
+    paddingBottom: 16,
   },
   orderCard: {
     backgroundColor: '#ffffff',
@@ -344,6 +344,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#111827',
   },
+  orderDetails: {
+    gap: 8,
+    marginBottom: 12,
+  },
+  orderDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  orderDetailText: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
   emptyState: {
     paddingVertical: 48,
     alignItems: 'center',
@@ -351,5 +364,25 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 14,
     color: '#9ca3af',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 64,
+  },
+  emptyText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#9ca3af',
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6b7280',
   },
 });

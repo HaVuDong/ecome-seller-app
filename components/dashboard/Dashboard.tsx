@@ -1,72 +1,128 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '@/app/app';
+import { useAuth } from '@/contexts/AuthContext';
+import orderService, { OrderResponse } from '@/services/orderService';
+import productService from '@/services/productService';
 
 export function Dashboard() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const { user } = useAuth();
+  const [recentOrders, setRecentOrders] = useState<OrderResponse[]>([]);
+  const [stats, setStats] = useState({
+    totalRevenue: 0,
+    totalOrders: 0,
+    todayRevenue: 0,
+    totalProducts: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
 
-  const stats = [
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    if (!user) return;
+    
+    try {
+      setIsLoading(true);
+      const [ordersData, productsData] = await Promise.all([
+        orderService.getOrdersBySeller(user.id, 0, 5),
+        productService.getAllProducts(0, 100),
+      ]);
+      
+      setRecentOrders(ordersData.content);
+      
+      // Tính toán stats
+      const totalRevenue = ordersData.content.reduce((sum, order) => 
+        order.status === 'DELIVERED' ? sum + order.totalAmount : sum, 0
+      );
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayRevenue = ordersData.content
+        .filter(order => {
+          const orderDate = new Date(order.createdAt);
+          orderDate.setHours(0, 0, 0, 0);
+          return orderDate.getTime() === today.getTime() && order.status === 'DELIVERED';
+        })
+        .reduce((sum, order) => sum + order.totalAmount, 0);
+      
+      setStats({
+        totalRevenue,
+        totalOrders: ordersData.totalElements,
+        todayRevenue,
+        totalProducts: productsData.totalElements,
+      });
+    } catch (error: any) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const statsConfig = [
     {
       title: 'Tổng Doanh Thu',
-      value: '$12,458',
+      value: `$${stats.totalRevenue.toFixed(2)}`,
       icon: 'cash-outline',
-      change: '+12.5%',
       bgColor: '#eff6ff',
       iconColor: '#2563eb',
     },
     {
       title: 'Tổng Đơn Hàng',
-      value: '156',
+      value: stats.totalOrders.toString(),
       icon: 'bag-outline',
-      change: '+8.2%',
       bgColor: '#f0fdf4',
       iconColor: '#16a34a',
     },
     {
       title: 'Doanh Thu Hôm Nay',
-      value: '$842',
+      value: `$${stats.todayRevenue.toFixed(2)}`,
       icon: 'trending-up-outline',
-      change: '+15.3%',
       bgColor: '#faf5ff',
       iconColor: '#9333ea',
     },
     {
       title: 'Sản Phẩm',
-      value: '48',
+      value: stats.totalProducts.toString(),
       icon: 'cube-outline',
-      change: '+2',
       bgColor: '#fff7ed',
       iconColor: '#ea580c',
     },
   ];
 
-  const recentOrders = [
-    { id: '#ORD-001', customer: 'John Smith', amount: '$125.00', status: 'pending' },
-    { id: '#ORD-002', customer: 'Sarah Johnson', amount: '$89.50', status: 'processing' },
-    { id: '#ORD-003', customer: 'Mike Davis', amount: '$245.00', status: 'shipped' },
-    { id: '#ORD-004', customer: 'Emily Brown', amount: '$67.25', status: 'delivered' },
-  ];
-
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending':
+      case 'PENDING':
         return { bg: '#fef3c7', text: '#92400e' };
-      case 'processing':
+      case 'PROCESSING':
         return { bg: '#dbeafe', text: '#1e40af' };
-      case 'shipped':
+      case 'SHIPPED':
         return { bg: '#e9d5ff', text: '#6b21a8' };
-      case 'delivered':
+      case 'DELIVERED':
         return { bg: '#d1fae5', text: '#065f46' };
       default:
         return { bg: '#f3f4f6', text: '#1f2937' };
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      PENDING: 'Chờ',
+      PROCESSING: 'Đang xử lý',
+      SHIPPED: 'Đang giao',
+      DELIVERED: 'Đã giao',
+      CANCELLED: 'Đã hủy',
+    };
+    return labels[status] || status;
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <ScrollView style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Bảng Điều Khiển</Text>
@@ -75,20 +131,25 @@ export function Dashboard() {
 
       <View style={styles.content}>
         {/* Stats Grid */}
-        <View style={styles.statsGrid}>
-          {stats.map((stat, index) => (
-            <View key={index} style={styles.statCard}>
-              <View style={[styles.statIcon, { backgroundColor: stat.bgColor }]}>
-                <Ionicons name={stat.icon as any} size={20} color={stat.iconColor} />
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#2563eb" />
+          </View>
+        ) : (
+          <View style={styles.statsGrid}>
+            {statsConfig.map((stat, index) => (
+              <View key={index} style={styles.statCard}>
+                <View style={[styles.statIcon, { backgroundColor: stat.bgColor }]}>
+                  <Ionicons name={stat.icon as any} size={20} color={stat.iconColor} />
+                </View>
+                <Text style={styles.statTitle}>{stat.title}</Text>
+                <View style={styles.statRow}>
+                  <Text style={styles.statValue}>{stat.value}</Text>
+                </View>
               </View>
-              <Text style={styles.statTitle}>{stat.title}</Text>
-              <View style={styles.statRow}>
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statChange}>{stat.change}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
+        )}
 
         {/* Recent Orders */}
         <View style={styles.card}>
@@ -99,29 +160,35 @@ export function Dashboard() {
             </TouchableOpacity>
           </View>
           <View style={styles.ordersList}>
-            {recentOrders.map((order, index) => {
-              const statusColors = getStatusColor(order.status);
-              return (
-                <TouchableOpacity
-                  key={order.id}
-                  style={[styles.orderItem, index < recentOrders.length - 1 && styles.orderBorder]}
-                  onPress={() => navigation.navigate('OrderDetail', { orderId: order.id.replace('#', '') })}
-                >
-                  <View style={styles.orderLeft}>
-                    <Text style={styles.orderId}>{order.id}</Text>
-                    <Text style={styles.orderCustomer}>{order.customer}</Text>
-                  </View>
-                  <View style={styles.orderRight}>
-                    <Text style={styles.orderAmount}>{order.amount}</Text>
-                    <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
-                      <Text style={[styles.statusText, { color: statusColors.text }]}>
-                        {order.status}
-                      </Text>
+            {recentOrders.length === 0 ? (
+              <View style={styles.emptyOrders}>
+                <Text style={styles.emptyOrdersText}>Chưa có đơn hàng nào</Text>
+              </View>
+            ) : (
+              recentOrders.map((order, index) => {
+                const statusColors = getStatusColor(order.status);
+                return (
+                  <TouchableOpacity
+                    key={order.id}
+                    style={[styles.orderItem, index < recentOrders.length - 1 && styles.orderBorder]}
+                    onPress={() => navigation.navigate('OrderDetail', { orderId: order.id.toString() })}
+                  >
+                    <View style={styles.orderLeft}>
+                      <Text style={styles.orderId}>#{order.orderNumber}</Text>
+                      <Text style={styles.orderCustomer}>{order.user?.fullName || 'Khách hàng'}</Text>
                     </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+                    <View style={styles.orderRight}>
+                      <Text style={styles.orderAmount}>${order.totalAmount.toFixed(2)}</Text>
+                      <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
+                        <Text style={[styles.statusText, { color: statusColors.text }]}>
+                          {getStatusLabel(order.status)}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
           </View>
         </View>
 
@@ -156,6 +223,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f9fafb',
+    paddingBottom: 16,
   },
   header: {
     backgroundColor: '#ffffff',
@@ -321,5 +389,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#2563eb',
+  },
+  loadingContainer: {
+    paddingVertical: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyOrders: {
+    paddingVertical: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyOrdersText: {
+    fontSize: 14,
+    color: '#9ca3af',
   },
 });
