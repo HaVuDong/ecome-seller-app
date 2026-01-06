@@ -14,10 +14,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '@/app/app';
-import orderService, { OrderResponse } from '@/services/orderService';
+import { useAuth } from '@/contexts/AuthContext';
+import orderService, { 
+  OrderResponse, 
+  PaymentStatus, 
+  ShippingStatus,
+  PAYMENT_STATUS_LABELS,
+  SHIPPING_STATUS_LABELS,
+  PAYMENT_STATUS_COLORS,
+  SHIPPING_STATUS_COLORS,
+} from '@/services/orderService';
 
 export function OrdersList() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [orders, setOrders] = useState<OrderResponse[]>([]);
@@ -25,17 +35,30 @@ export function OrdersList() {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    loadOrders();
-  }, []);
+    if (user?.id) {
+      loadOrders();
+    }
+  }, [user?.id]);
 
   const loadOrders = async () => {
+    if (!user?.id) return;
+    
     try {
       setIsLoading(true);
-      const response = await orderService.getAllOrders(0, 100);
-      setOrders(response.content);
+      // Sử dụng API mới - backend lấy seller từ JWT
+      const response = await orderService.getMyOrders(0, 100);
+      if (response.success) {
+        setOrders(response.data.content);
+      }
     } catch (error: any) {
-      console.error('Error loading orders:', error);
-      Alert.alert('Lỗi', 'Không thể tải danh sách đơn hàng');
+      // Fallback to old API
+      try {
+        const response = await orderService.getOrdersBySeller(user.id, 0, 100);
+        setOrders(response.content);
+      } catch {
+        console.error('Error loading orders:', error);
+        Alert.alert('Lỗi', 'Không thể tải danh sách đơn hàng');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -49,48 +72,28 @@ export function OrdersList() {
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
-      order.orderNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.id?.toString().includes(searchQuery) ||
       order.user?.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.user?.email?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesTab = activeTab === 'all' || order.status.toLowerCase() === activeTab.toLowerCase();
-
-    return matchesSearch && matchesTab;
+    // Filter theo tab (sử dụng shippingStatus thay vì status cũ)
+    if (activeTab === 'all') return matchesSearch;
+    return matchesSearch && order.shippingStatus?.toLowerCase() === activeTab.toLowerCase();
   });
 
-  const getStatusColor = (status: string) => {
-    const statusLower = status.toLowerCase();
-    switch (statusLower) {
-      case 'pending':
-        return { bg: '#fef3c7', text: '#92400e' };
-      case 'processing':
-        return { bg: '#dbeafe', text: '#1e40af' };
-      case 'shipped':
-        return { bg: '#e9d5ff', text: '#6b21a8' };
-      case 'delivered':
-        return { bg: '#d1fae5', text: '#065f46' };
-      case 'cancelled':
-        return { bg: '#fee2e2', text: '#991b1b' };
-      default:
-        return { bg: '#f3f4f6', text: '#1f2937' };
-    }
+  // Màu sắc cho trạng thái thanh toán
+  const getPaymentStatusColor = (status: PaymentStatus) => {
+    return PAYMENT_STATUS_COLORS[status] || '#6b7280';
+  };
+
+  // Màu sắc cho trạng thái vận chuyển
+  const getShippingStatusColor = (status: ShippingStatus) => {
+    return SHIPPING_STATUS_COLORS[status] || '#6b7280';
   };
 
   const getStatusCount = (status: string) => {
     if (status === 'all') return orders.length;
-    return orders.filter((o) => o.status.toLowerCase() === status.toLowerCase()).length;
-  };
-
-  const getStatusLabel = (status: string) => {
-    const statusLower = status.toLowerCase();
-    switch (statusLower) {
-      case 'pending': return 'Chờ xử lý';
-      case 'processing': return 'Đang xử lý';
-      case 'shipped': return 'Đã gửi';
-      case 'delivered': return 'Đã giao';
-      case 'cancelled': return 'Đã hủy';
-      default: return status;
-    }
+    return orders.filter((o) => o.shippingStatus?.toLowerCase() === status.toLowerCase()).length;
   };
 
   if (isLoading) {
@@ -123,7 +126,7 @@ export function OrdersList() {
           />
         </View>
 
-        {/* Tabs */}
+        {/* Tabs - Filter theo trạng thái vận chuyển */}
         <View style={styles.tabsContainer}>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'all' && styles.tabActive]}
@@ -142,11 +145,11 @@ export function OrdersList() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'processing' && styles.tabActive]}
-            onPress={() => setActiveTab('processing')}
+            style={[styles.tab, activeTab === 'shipped' && styles.tabActive]}
+            onPress={() => setActiveTab('shipped')}
           >
-            <Text style={[styles.tabText, activeTab === 'processing' && styles.tabTextActive]}>
-              Đang xử lý ({getStatusCount('processing')})
+            <Text style={[styles.tabText, activeTab === 'shipped' && styles.tabTextActive]}>
+              Đang giao ({getStatusCount('shipped')})
             </Text>
           </TouchableOpacity>
         </View>
@@ -167,7 +170,8 @@ export function OrdersList() {
           </View>
         ) : (
           filteredOrders.map((order) => {
-            const statusColor = getStatusColor(order.status);
+            const paymentColor = getPaymentStatusColor(order.paymentStatus);
+            const shippingColor = getShippingStatusColor(order.shippingStatus);
             const totalItems = order.orderItems?.reduce((sum, item) => sum + item.quantity, 0) || 0;
             
             return (
@@ -178,13 +182,23 @@ export function OrdersList() {
               >
                 <View style={styles.orderHeader}>
                   <View style={styles.orderHeaderLeft}>
-                    <Text style={styles.orderId}>#{order.orderNumber || order.id}</Text>
+                    <Text style={styles.orderId}>#{order.id}</Text>
                     <Text style={styles.orderCustomer}>{order.user?.fullName || 'Khách hàng'}</Text>
                   </View>
-                  <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
-                    <Text style={[styles.statusBadgeText, { color: statusColor.text }]}>
-                      {getStatusLabel(order.status)}
-                    </Text>
+                  {/* Hiển thị 2 badge cho 2 trạng thái */}
+                  <View style={styles.statusBadges}>
+                    <View style={[styles.statusBadge, { backgroundColor: paymentColor + '20' }]}>
+                      <Ionicons name="card-outline" size={12} color={paymentColor} />
+                      <Text style={[styles.statusBadgeText, { color: paymentColor }]}>
+                        {PAYMENT_STATUS_LABELS[order.paymentStatus] || order.paymentStatus}
+                      </Text>
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: shippingColor + '20' }]}>
+                      <Ionicons name="car-outline" size={12} color={shippingColor} />
+                      <Text style={[styles.statusBadgeText, { color: shippingColor }]}>
+                        {SHIPPING_STATUS_LABELS[order.shippingStatus] || order.shippingStatus}
+                      </Text>
+                    </View>
                   </View>
                 </View>
 
@@ -207,7 +221,7 @@ export function OrdersList() {
 
                 <View style={styles.orderFooter}>
                   <Text style={styles.orderTotal}>
-                    {order.totalAmount.toLocaleString('vi-VN')} đ
+                    {(order.finalAmount || order.totalAmount).toLocaleString('vi-VN')} đ
                   </Text>
                   <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
                 </View>
@@ -322,12 +336,20 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
+    gap: 4,
+  },
+  statusBadges: {
+    flexDirection: 'column',
+    gap: 4,
+    alignItems: 'flex-end',
   },
   statusBadgeText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
   },
   orderFooter: {

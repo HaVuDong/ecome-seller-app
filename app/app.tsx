@@ -17,6 +17,7 @@ import { OrderDetail } from '@/components/orders/OrderDetail';
 import { Chat } from '@/components/chat/Chat';
 import { Profile } from '@/components/profile/Profile';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export type Screen = 
   | 'dang-nhap' 
@@ -105,6 +106,10 @@ function ProfileTabScreen() {
 }
 
 function MainTabs() {
+  const insets = useSafeAreaInsets();
+  // Tự động điều chỉnh padding dựa trên safe area của điện thoại
+  const bottomPadding = insets.bottom > 0 ? insets.bottom : 10;
+  
   return (
     <Tab.Navigator
       screenOptions={{
@@ -114,10 +119,10 @@ function MainTabs() {
           backgroundColor: '#ffffff',
           borderTopColor: '#e5e7eb',
           borderTopWidth: 1,
-          paddingBottom: 5,
-          paddingTop: 5,
-          height: 60,
-          marginBottom: 40,
+          paddingBottom: bottomPadding,
+          paddingTop: 8,
+          height: 60 + bottomPadding,
+          // Không cần marginBottom vì đã tính safe area
         },
         headerShown: false,
       }}

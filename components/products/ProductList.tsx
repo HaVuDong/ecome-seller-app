@@ -15,21 +15,38 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp, useFocusEffect } from '@react-navigation/native';
 import type { RootStackParamList } from '@/app/app';
 import productService, { ProductResponse } from '@/services/productService';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function ProductList() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState<ProductResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Chỉ load sản phẩm của seller hiện tại (từ JWT)
   const loadProducts = async () => {
+    if (!user?.id) {
+      setIsLoading(false);
+      return;
+    }
+    
     try {
       setIsLoading(true);
-      const response = await productService.getAllProducts(0, 100);
-      setProducts(response.content);
+      // Sử dụng API mới - backend lấy seller từ JWT
+      const response = await productService.getMyProducts(0, 100);
+      if (response.success) {
+        setProducts(response.data.content);
+      }
     } catch (error: any) {
-      Alert.alert('Lỗi', error.message || 'Không thể tải danh sách sản phẩm');
+      // Fallback to old API nếu cần
+      try {
+        const response = await productService.getProductsBySeller(user.id, 0, 100);
+        setProducts(response.content);
+      } catch {
+        Alert.alert('Lỗi', error.message || 'Không thể tải danh sách sản phẩm');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -37,15 +54,17 @@ export function ProductList() {
 
   useEffect(() => {
     loadProducts();
-  }, []);
+  }, [user?.id]);
 
   useFocusEffect(
     useCallback(() => {
       loadProducts();
-    }, [])
+    }, [user?.id])
   );
 
   const handleSearch = async () => {
+    if (!user?.id) return;
+    
     if (!searchQuery.trim()) {
       loadProducts();
       return;
@@ -53,8 +72,13 @@ export function ProductList() {
     
     try {
       setIsLoading(true);
-      const response = await productService.searchProducts(searchQuery, 0, 100);
-      setProducts(response.content);
+      // Tìm kiếm trong sản phẩm của seller
+      const response = await productService.getProductsBySeller(user.id, 0, 100);
+      // Filter locally by search query
+      const filtered = response.content.filter(p => 
+        p.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setProducts(filtered);
     } catch (error: any) {
       Alert.alert('Lỗi', 'Không thể tìm kiếm sản phẩm');
     } finally {
@@ -81,11 +105,14 @@ export function ProductList() {
           style: 'destructive', 
           onPress: async () => {
             try {
-              await productService.deleteProduct(productId);
-              Alert.alert('Thành công', 'Đã xóa sản phẩm');
-              loadProducts();
+              // Backend kiểm tra quyền sở hữu từ JWT
+              const response = await productService.deleteProduct(productId);
+              if (response.success) {
+                Alert.alert('Thành công', 'Đã xóa sản phẩm');
+                loadProducts();
+              }
             } catch (error: any) {
-              Alert.alert('Lỗi', error.message || 'Không thể xóa sản phẩm');
+              Alert.alert('Lỗi', error.response?.data?.message || error.message || 'Không thể xóa sản phẩm');
             }
           }
         },

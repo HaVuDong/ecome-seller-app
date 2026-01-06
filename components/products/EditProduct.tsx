@@ -18,6 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
 import productService from '@/services/productService';
 import categoryService, { CategoryResponse } from '@/services/categoryService';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface EditProductProps {
   route: {
@@ -29,6 +30,7 @@ interface EditProductProps {
 
 export function EditProduct({ route }: EditProductProps) {
   const navigation = useNavigation();
+  const { user } = useAuth();
   const { productId } = route.params;
 
   const [formData, setFormData] = useState({
@@ -106,6 +108,11 @@ export function EditProduct({ route }: EditProductProps) {
     console.log('categoryId value:', formData.categoryId);
     console.log('categoryId type:', typeof formData.categoryId);
     
+    if (!user?.id) {
+      Alert.alert('Lỗi', 'Vui lòng đăng nhập lại');
+      return;
+    }
+    
     if (!formData.name || !formData.price || !formData.categoryId || !formData.stock) {
       Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin');
       console.log('Validation failed:', {
@@ -126,7 +133,6 @@ export function EditProduct({ route }: EditProductProps) {
     }
 
     const updateData = {
-      sellerId: 0,
       categoryId: categoryId,
       name: formData.name,
       description: formData.description,
@@ -140,10 +146,14 @@ export function EditProduct({ route }: EditProductProps) {
 
     try {
       setIsSubmitting(true);
-      await productService.updateProduct(parseInt(productId), updateData);
+      // Backend kiểm tra quyền sở hữu từ JWT token
+      const response = await productService.updateProduct(parseInt(productId), updateData);
       
-      console.log('Product updated successfully');
-      navigation.goBack();
+      if (response.success) {
+        console.log('Product updated successfully');
+        Alert.alert('Thành công', 'Đã cập nhật sản phẩm');
+        navigation.goBack();
+      }
     } catch (error: any) {
       console.error('Update product error:', error);
       console.error('Error response:', error.response?.data);

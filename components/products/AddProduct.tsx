@@ -68,8 +68,8 @@ export function AddProduct() {
 
     try {
       setIsLoading(true);
-      await productService.createProduct({
-        sellerId: user.id,
+      // Backend sẽ lấy seller từ JWT token, không cần truyền sellerId
+      const response = await productService.createProduct({
         categoryId: parseInt(formData.categoryId),
         name: formData.name,
         description: formData.description,
@@ -78,10 +78,12 @@ export function AddProduct() {
         mainImage: images[0] || '',
         isActive: true,
       });
-      Alert.alert('Thành công', 'Đã thêm sản phẩm mới');
-      navigation.goBack();
+      if (response.success) {
+        Alert.alert('Thành công', 'Đã thêm sản phẩm mới');
+        navigation.goBack();
+      }
     } catch (error: any) {
-      Alert.alert('Lỗi', error.message || 'Không thể thêm sản phẩm');
+      Alert.alert('Lỗi', error.response?.data?.message || error.message || 'Không thể thêm sản phẩm');
     } finally {
       setIsLoading(false);
     }

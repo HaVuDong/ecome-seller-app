@@ -13,7 +13,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
-import orderService, { OrderResponse } from '@/services/orderService';
+import orderService, { 
+  OrderResponse, 
+  PaymentStatus, 
+  ShippingStatus,
+  PAYMENT_STATUS_LABELS,
+  SHIPPING_STATUS_LABELS,
+  PAYMENT_STATUS_COLORS,
+  SHIPPING_STATUS_COLORS,
+} from '@/services/orderService';
 
 interface OrderDetailProps {
   route: {
@@ -28,7 +36,8 @@ export function OrderDetail({ route }: OrderDetailProps) {
   const { orderId } = route.params;
   const [order, setOrder] = useState<OrderResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [orderStatus, setOrderStatus] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('PENDING');
+  const [shippingStatus, setShippingStatus] = useState<ShippingStatus>('PENDING');
 
   useEffect(() => {
     loadOrderDetail();
@@ -39,7 +48,8 @@ export function OrderDetail({ route }: OrderDetailProps) {
       setIsLoading(true);
       const data = await orderService.getOrderById(Number(orderId));
       setOrder(data);
-      setOrderStatus(data.status);
+      setPaymentStatus(data.paymentStatus || 'PENDING');
+      setShippingStatus(data.shippingStatus || 'PENDING');
     } catch (error: any) {
       console.error('Error loading order detail:', error);
       Alert.alert('Lỗi', 'Không thể tải chi tiết đơn hàng');
@@ -49,47 +59,33 @@ export function OrderDetail({ route }: OrderDetailProps) {
     }
   };
 
-  const handleStatusChange = async (newStatus: string) => {
+  // Cập nhật trạng thái thanh toán
+  const handlePaymentStatusChange = async (newStatus: PaymentStatus) => {
     if (!order) return;
     
     try {
-      await orderService.updateOrderStatus(order.id, newStatus);
-      setOrderStatus(newStatus);
-      Alert.alert('Thành công', 'Đã cập nhật trạng thái đơn hàng');
+      await orderService.updatePaymentStatus(order.id, newStatus);
+      setPaymentStatus(newStatus);
+      Alert.alert('Thành công', 'Đã cập nhật trạng thái thanh toán');
       loadOrderDetail();
     } catch (error: any) {
-      console.error('Error updating status:', error);
-      Alert.alert('Lỗi', 'Không thể cập nhật trạng thái');
+      console.error('Error updating payment status:', error);
+      Alert.alert('Lỗi', 'Không thể cập nhật trạng thái thanh toán');
     }
   };
 
-  const getStatusColor = (status: string) => {
-    const statusLower = status?.toLowerCase() || '';
-    switch (statusLower) {
-      case 'pending':
-        return { bg: '#fef3c7', text: '#92400e' };
-      case 'processing':
-        return { bg: '#dbeafe', text: '#1e40af' };
-      case 'shipped':
-        return { bg: '#e9d5ff', text: '#6b21a8' };
-      case 'delivered':
-        return { bg: '#d1fae5', text: '#065f46' };
-      case 'cancelled':
-        return { bg: '#fee2e2', text: '#991b1b' };
-      default:
-        return { bg: '#f3f4f6', text: '#1f2937' };
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    const statusLower = status?.toLowerCase() || '';
-    switch (statusLower) {
-      case 'pending': return 'Chờ xử lý';
-      case 'processing': return 'Đang xử lý';
-      case 'shipped': return 'Đã gửi';
-      case 'delivered': return 'Đã giao';
-      case 'cancelled': return 'Đã hủy';
-      default: return status;
+  // Cập nhật trạng thái vận chuyển
+  const handleShippingStatusChange = async (newStatus: ShippingStatus) => {
+    if (!order) return;
+    
+    try {
+      await orderService.updateShippingStatus(order.id, newStatus);
+      setShippingStatus(newStatus);
+      Alert.alert('Thành công', 'Đã cập nhật trạng thái vận chuyển');
+      loadOrderDetail();
+    } catch (error: any) {
+      console.error('Error updating shipping status:', error);
+      Alert.alert('Lỗi', 'Không thể cập nhật trạng thái vận chuyển');
     }
   };
 
@@ -104,7 +100,8 @@ export function OrderDetail({ route }: OrderDetailProps) {
     );
   }
 
-  const statusColor = getStatusColor(orderStatus);
+  const paymentColor = PAYMENT_STATUS_COLORS[paymentStatus] || '#6b7280';
+  const shippingColor = SHIPPING_STATUS_COLORS[shippingStatus] || '#6b7280';
   const totalItems = order.orderItems?.reduce((sum, item) => sum + item.quantity, 0) || 0;
 
   return (
@@ -117,16 +114,26 @@ export function OrderDetail({ route }: OrderDetailProps) {
               <Ionicons name="arrow-back" size={24} color="#111827" />
             </TouchableOpacity>
             <View style={styles.headerInfo}>
-              <Text style={styles.headerTitle}>Đơn hàng #{order.orderNumber || order.id}</Text>
+              <Text style={styles.headerTitle}>Đơn hàng #{order.id}</Text>
               <Text style={styles.headerDate}>
                 {new Date(order.createdAt).toLocaleString('vi-VN')}
               </Text>
             </View>
-          <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
-            <Text style={[styles.statusBadgeText, { color: statusColor.text }]}>
-              {getStatusLabel(orderStatus)}
-            </Text>
-          </View>
+            {/* Hiển thị 2 badge trạng thái */}
+            <View style={styles.statusBadges}>
+              <View style={[styles.statusBadge, { backgroundColor: paymentColor + '20' }]}>
+                <Ionicons name="card-outline" size={12} color={paymentColor} />
+                <Text style={[styles.statusBadgeText, { color: paymentColor }]}>
+                  {PAYMENT_STATUS_LABELS[paymentStatus]}
+                </Text>
+              </View>
+              <View style={[styles.statusBadge, { backgroundColor: shippingColor + '20' }]}>
+                <Ionicons name="car-outline" size={12} color={shippingColor} />
+                <Text style={[styles.statusBadgeText, { color: shippingColor }]}>
+                  {SHIPPING_STATUS_LABELS[shippingStatus]}
+                </Text>
+              </View>
+            </View>
         </View>
       </View>
 
@@ -180,30 +187,60 @@ export function OrderDetail({ route }: OrderDetailProps) {
               <Text style={styles.priceValue}>{order.paymentMethod || 'N/A'}</Text>
             </View>
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Trạng thái thanh toán</Text>
-              <Text style={styles.priceValue}>{order.paymentStatus || 'N/A'}</Text>
+              <Text style={styles.priceLabel}>Phí vận chuyển</Text>
+              <Text style={styles.priceValue}>{(order.shippingFee || 0).toLocaleString('vi-VN')} đ</Text>
+            </View>
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>Giảm giá</Text>
+              <Text style={styles.priceValue}>-{(order.discountAmount || 0).toLocaleString('vi-VN')} đ</Text>
             </View>
             <View style={[styles.priceRow, styles.totalRow]}>
               <Text style={styles.totalLabel}>Tổng cộng</Text>
-              <Text style={styles.totalValue}>{order.totalAmount.toLocaleString('vi-VN')} đ</Text>
+              <Text style={styles.totalValue}>{(order.finalAmount || order.totalAmount).toLocaleString('vi-VN')} đ</Text>
             </View>
           </View>
         </View>
 
-        {/* Update Status */}
+        {/* Update Payment Status */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Cập nhật trạng thái đơn hàng</Text>
+          <View style={styles.cardTitleRow}>
+            <Ionicons name="card-outline" size={20} color="#10b981" />
+            <Text style={styles.cardTitle}>Trạng thái thanh toán</Text>
+          </View>
           <View style={styles.pickerContainer}>
             <Picker
-              selectedValue={orderStatus}
-              onValueChange={(itemValue) => handleStatusChange(itemValue)}
+              selectedValue={paymentStatus}
+              onValueChange={(itemValue) => handlePaymentStatusChange(itemValue as PaymentStatus)}
+              style={styles.picker}
+            >
+              <Picker.Item label="Chờ thanh toán" value="PENDING" />
+              <Picker.Item label="Đã thanh toán" value="PAID" />
+              <Picker.Item label="Thanh toán thất bại" value="FAILED" />
+              <Picker.Item label="Đã hoàn tiền" value="REFUNDED" />
+              <Picker.Item label="Đã hủy" value="CANCELLED" />
+            </Picker>
+          </View>
+        </View>
+
+        {/* Update Shipping Status */}
+        <View style={styles.card}>
+          <View style={styles.cardTitleRow}>
+            <Ionicons name="car-outline" size={20} color="#007bff" />
+            <Text style={styles.cardTitle}>Trạng thái vận chuyển</Text>
+          </View>
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={shippingStatus}
+              onValueChange={(itemValue) => handleShippingStatusChange(itemValue as ShippingStatus)}
               style={styles.picker}
             >
               <Picker.Item label="Chờ xử lý" value="PENDING" />
-              <Picker.Item label="Đang xử lý" value="PROCESSING" />
-              <Picker.Item label="Đã gửi hàng" value="SHIPPED" />
+              <Picker.Item label="Đang chuẩn bị hàng" value="PROCESSING" />
+              <Picker.Item label="Đã giao cho vận chuyển" value="SHIPPED" />
+              <Picker.Item label="Đang vận chuyển" value="IN_TRANSIT" />
               <Picker.Item label="Đã giao hàng" value="DELIVERED" />
               <Picker.Item label="Đã hủy" value="CANCELLED" />
+              <Picker.Item label="Đã trả hàng" value="RETURNED" />
             </Picker>
           </View>
         </View>
@@ -263,12 +300,20 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   statusBadge: {
-    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
+    gap: 4,
+  },
+  statusBadges: {
+    flexDirection: 'column',
+    gap: 4,
+    alignItems: 'flex-end',
   },
   statusBadgeText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
   },
   scrollView: {
@@ -290,6 +335,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#111827',
     marginBottom: 16,
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
   },
   customerInfo: {
     gap: 12,

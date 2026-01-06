@@ -1,34 +1,26 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import { LOCAL_IP, logNetworkConfig } from '../config/network';
 
-// Cấu hình API Base URL
-// Tự động detect platform và dùng URL phù hợp:
-// - Web Browser: http://localhost:8080/api
-// - Android/iOS thiết bị thật: http://172.21.7.162:8080/api (IP máy tính)
-// - Android Emulator: http://10.0.2.2:8080/api
-// - iOS Simulator: http://localhost:8080/api
-
-const LOCAL_IP = '172.21.7.162'; // Thay bằng IP máy tính của bạn
+/**
+ * API Configuration
+ * 
+ * 🔴 ĐỔI MẠNG WIFI? → Sửa IP trong file: config/network.ts
+ */
 
 const getApiBaseUrl = () => {
   if (Platform.OS === 'web') {
-    // Web browser: dùng localhost
     return 'http://localhost:8080/api';
   }
-  
-  if (Platform.OS === 'android') {
-    // Android thiết bị thật: dùng IP máy tính
-    // Nếu dùng emulator, thay bằng: return 'http://10.0.2.2:8080/api';
-    return `http://${LOCAL_IP}:8080/api`;
-  }
-  
-  // iOS thiết bị thật: dùng IP máy tính
-  // iOS simulator: dùng localhost
+  // Android/iOS thiết bị thật: dùng IP từ config
   return `http://${LOCAL_IP}:8080/api`;
 };
 
 const API_BASE_URL = getApiBaseUrl();
+
+// Log config khi khởi động (chỉ 1 lần)
+logNetworkConfig();
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,

@@ -3,9 +3,15 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
-import { UserStats } from '@/services/userService';
+import dashboardService from '@/services/dashboardService';
 import { EditProfile } from './EditProfile';
 import { useNavigation } from '@react-navigation/native';
+
+interface UserStats {
+  totalOrders: number;
+  totalProducts: number;
+  averageRating: number;
+}
 
 interface ProfileProps {
   onLogout: () => void;
@@ -14,7 +20,7 @@ interface ProfileProps {
 export function Profile({ onLogout }: ProfileProps) {
   const { user: authUser, refreshUser, logout } = useAuth();
   const navigation = useNavigation();
-  const [stats] = useState<UserStats>({ totalOrders: 0, totalProducts: 0, averageRating: 0 });
+  const [stats, setStats] = useState<UserStats>({ totalOrders: 0, totalProducts: 0, averageRating: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [showEditProfile, setShowEditProfile] = useState(false);
 
@@ -23,9 +29,21 @@ export function Profile({ onLogout }: ProfileProps) {
       try {
         setIsLoading(true);
         await refreshUser();
-        // TODO: Load stats khi backend có API
-        // const userStats = await userService.getUserStats(authUser?.id || 0);
-        // setStats(userStats);
+        
+        // Load stats từ dashboard API
+        try {
+          const dashboardResponse = await dashboardService.getSellerDashboard();
+          if (dashboardResponse.success && dashboardResponse.data) {
+            const { totalOrders, totalProducts, averageRating } = dashboardResponse.data;
+            setStats({
+              totalOrders: totalOrders || 0,
+              totalProducts: totalProducts || 0,
+              averageRating: averageRating || 0,
+            });
+          }
+        } catch (dashboardError) {
+          console.error('Error loading dashboard stats:', dashboardError);
+        }
       } catch (error: any) {
         console.error('Error loading user data:', error);
         Alert.alert('Lỗi', 'Không thể tải thông tin người dùng');

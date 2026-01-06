@@ -26,7 +26,6 @@ export interface ProductResponse {
 }
 
 export interface ProductRequest {
-  sellerId: number;
   categoryId: number;
   name: string;
   description?: string;
@@ -43,6 +42,14 @@ export interface PageResponse<T> {
   totalPages: number;
   size: number;
   number: number;
+}
+
+// API Response wrapper từ backend mới
+export interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data: T;
+  timestamp: string;
 }
 
 class ProductService {
@@ -72,18 +79,66 @@ class ProductService {
     return response.data;
   }
 
-  async createProduct(data: ProductRequest): Promise<ProductResponse> {
+  // Tìm kiếm nâng cao với filters
+  async searchProductsAdvanced(params: {
+    keyword?: string;
+    categoryId?: number;
+    minPrice?: number;
+    maxPrice?: number;
+    minRating?: number;
+    page?: number;
+    size?: number;
+    sortBy?: string;
+    direction?: 'ASC' | 'DESC';
+  }): Promise<ApiResponse<PageResponse<ProductResponse>>> {
+    const response = await apiClient.get('/products/search/advanced', { params });
+    return response.data;
+  }
+
+  // Tạo sản phẩm - Backend lấy seller từ JWT
+  async createProduct(data: ProductRequest): Promise<ApiResponse<ProductResponse>> {
     const response = await apiClient.post('/products', data);
     return response.data;
   }
 
-  async updateProduct(id: number, data: ProductRequest): Promise<ProductResponse> {
+  // Cập nhật sản phẩm - Backend kiểm tra quyền từ JWT
+  async updateProduct(id: number, data: ProductRequest): Promise<ApiResponse<ProductResponse>> {
     const response = await apiClient.put(`/products/${id}`, data);
     return response.data;
   }
 
-  async deleteProduct(id: number): Promise<void> {
-    await apiClient.delete(`/products/${id}`);
+  // Xóa sản phẩm - Backend kiểm tra quyền từ JWT  
+  async deleteProduct(id: number): Promise<ApiResponse<void>> {
+    const response = await apiClient.delete(`/products/${id}`);
+    return response.data;
+  }
+
+  // Lấy sản phẩm của seller hiện tại (từ JWT)
+  async getMyProducts(page = 0, size = 20): Promise<ApiResponse<PageResponse<ProductResponse>>> {
+    const response = await apiClient.get('/products/my-products', {
+      params: { page, size },
+    });
+    return response.data;
+  }
+
+  // Lấy sản phẩm của seller khác (public)
+  async getProductsBySeller(sellerId: number, page = 0, size = 20): Promise<PageResponse<ProductResponse>> {
+    const response = await apiClient.get(`/products/seller/${sellerId}`, {
+      params: { page, size },
+    });
+    return response.data;
+  }
+
+  // Top sản phẩm bán chạy
+  async getTopSellingProducts(): Promise<ProductResponse[]> {
+    const response = await apiClient.get('/products/top-selling');
+    return response.data;
+  }
+
+  // Sản phẩm mới nhất
+  async getNewestProducts(): Promise<ProductResponse[]> {
+    const response = await apiClient.get('/products/newest');
+    return response.data;
   }
 
   async uploadImage(file: File): Promise<{ url: string; filename: string }> {

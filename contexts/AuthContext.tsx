@@ -45,8 +45,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       ]);
 
       if (storedToken && storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        
+        // Kiểm tra role - chỉ cho phép SELLER trong app Ecome
+        if (parsedUser.role !== 'SELLER') {
+          console.log('User is not SELLER, clearing stored auth');
+          await AsyncStorage.removeItem('token');
+          await AsyncStorage.removeItem('user');
+          return;
+        }
+        
         setToken(storedToken);
-        setUser(JSON.parse(storedUser));
+        setUser(parsedUser);
       }
     } catch (error) {
       console.error('Error loading auth:', error);
@@ -59,6 +69,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const response = await authService.login(data);
       
+      // Kiểm tra role - App Ecome chỉ dành cho SELLER
+      if (response.user.role !== 'SELLER') {
+        throw new Error('Tài khoản này không phải là tài khoản người bán. Vui lòng sử dụng app khách hàng.');
+      }
+      
       // Save to state
       setToken(response.token);
       setUser(response.user);
@@ -67,6 +82,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await AsyncStorage.setItem('token', response.token);
       await AsyncStorage.setItem('user', JSON.stringify(response.user));
     } catch (error: any) {
+      // Nếu là lỗi role check, throw message đó
+      if (error.message?.includes('người bán')) {
+        throw error;
+      }
       throw new Error(error.response?.data?.message || 'Đăng nhập thất bại');
     }
   };
