@@ -1,30 +1,22 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
-import { LOCAL_IP, logNetworkConfig } from '../config/network';
+import { getApiUrl, logNetworkConfig } from '../config/network';
 
 /**
  * API Configuration
  * 
- * 🔴 ĐỔI MẠNG WIFI? → Sửa IP trong file: config/network.ts
+ * 🟢 Sử dụng cấu hình từ config/network.ts
+ * Đổi USE_PRODUCTION = true/false để chuyển giữa Render và Local
  */
 
-const getApiBaseUrl = () => {
-  if (Platform.OS === 'web') {
-    return 'http://localhost:8080/api';
-  }
-  // Android/iOS thiết bị thật: dùng IP từ config
-  return `http://${LOCAL_IP}:8080/api`;
-};
-
-const API_BASE_URL = getApiBaseUrl();
+const API_BASE_URL = getApiUrl();
 
 // Log config khi khởi động (chỉ 1 lần)
 logNetworkConfig();
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 60000, // 60s cho Render free tier cold start
   headers: {
     'Content-Type': 'application/json',
   },

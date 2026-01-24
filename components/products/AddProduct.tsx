@@ -32,6 +32,7 @@ export function AddProduct() {
   });
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [images, setImages] = useState<string[]>([]);
+  const [selectedFile, setSelectedFile] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isCategoriesLoading, setIsCategoriesLoading] = useState(true);
 
@@ -69,7 +70,7 @@ export function AddProduct() {
     try {
       setIsLoading(true);
       // Backend sẽ lấy seller từ JWT token, không cần truyền sellerId
-      const response = await productService.createProduct({
+      const payload = {
         categoryId: parseInt(formData.categoryId),
         name: formData.name,
         description: formData.description,
@@ -77,7 +78,16 @@ export function AddProduct() {
         stock: parseInt(formData.stock),
         mainImage: images[0] || '',
         isActive: true,
-      });
+      };
+
+      let response;
+      if (selectedFile) {
+        // upload as multipart/form-data (product JSON + file)
+        response = await productService.createProductWithImage(payload, selectedFile as any);
+      } else {
+        response = await productService.createProduct(payload);
+      }
+
       if (response.success) {
         Alert.alert('Thành công', 'Đã thêm sản phẩm mới');
         navigation.goBack();
@@ -89,15 +99,42 @@ export function AddProduct() {
     }
   };
 
-  const handleImageUpload = () => {
-    // Simulate image upload - in real app, this would open file picker
-    const mockImage =
-      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop';
-    setImages((prev) => [...prev, mockImage]);
+  const handleImageUpload = async () => {
+    // Open image picker (Expo ImagePicker)
+    try {
+      const permission = await (await import('expo-image-picker')).requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Quyền truy cập bị từ chối', 'Vui lòng cho phép truy cập ảnh');
+        return;
+      }
+      const ImagePicker = await import('expo-image-picker');
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+        allowsEditing: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setImages((prev) => [...prev, asset.uri]);
+        // Save file info for upload
+        setSelectedFile({
+          uri: asset.uri,
+          name: asset.fileName || asset.uri.split('/').pop() || 'photo.jpg',
+          type: asset.type ? `image/${asset.type}` : 'image/jpeg',
+        } as any);
+      }
+    } catch (error: any) {
+      Alert.alert('Lỗi', 'Không thể chọn ảnh');
+    }
   };
 
   const removeImage = (index: number) => {
     setImages((prev) => prev.filter((_, i) => i !== index));
+    // clear selected file if removed the first image which is used for upload
+    if (index === 0) {
+      setSelectedFile(null);
+    }
   };
 
   return (

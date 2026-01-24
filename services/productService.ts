@@ -101,6 +101,18 @@ class ProductService {
     return response.data;
   }
 
+  async createProductWithImage(data: ProductRequest, file?: File | null): Promise<ApiResponse<ProductResponse>> {
+    const formData = new FormData();
+    formData.append('product', JSON.stringify(data));
+    if (file) {
+      formData.append('file', file as any);
+    }
+    const response = await apiClient.post('/products', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
   // Cập nhật sản phẩm - Backend kiểm tra quyền từ JWT
   async updateProduct(id: number, data: ProductRequest): Promise<ApiResponse<ProductResponse>> {
     const response = await apiClient.put(`/products/${id}`, data);
