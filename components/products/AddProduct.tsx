@@ -110,11 +110,19 @@ export function AddProduct() {
         return;
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaType.Images,
-        quality: 0.8,
-        allowsEditing: true,
-      });
+      // Fallback: some Expo versions expose MediaType, others MediaTypeOptions
+      const mediaTypes = ImagePicker?.MediaType?.Images ?? ImagePicker?.MediaTypeOptions?.Images ?? ImagePicker?.MediaType?.All ?? ImagePicker?.MediaTypeOptions?.All;
+      const launchOptions: any = { quality: 0.8, allowsEditing: true };
+      if (mediaTypes) launchOptions.mediaTypes = mediaTypes;
+
+      let result: any;
+      try {
+        result = await ImagePicker.launchImageLibraryAsync(launchOptions);
+      } catch (err: any) {
+        console.error('ImagePicker launch failed:', err);
+        Alert.alert('Lỗi', 'Không thể mở thư viện ảnh: ' + (err?.message || err));
+        return;
+      }
 
       const cancelled = result?.canceled ?? result?.cancelled ?? false;
       const uri = result?.assets?.[0]?.uri ?? result?.uri;
