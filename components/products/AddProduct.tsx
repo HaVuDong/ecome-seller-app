@@ -102,25 +102,30 @@ export function AddProduct() {
   const handleImageUpload = async () => {
     // Open image picker (Expo ImagePicker)
     try {
-      const permission = await (await import('expo-image-picker')).requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
+      const ImagePicker = await import('expo-image-picker');
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const granted = permission?.granted ?? (permission?.status === 'granted');
+      if (!granted) {
         Alert.alert('Quyền truy cập bị từ chối', 'Vui lòng cho phép truy cập ảnh');
         return;
       }
-      const ImagePicker = await import('expo-image-picker');
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaType.Images,
         quality: 0.8,
         allowsEditing: true,
       });
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-        setImages((prev) => [...prev, asset.uri]);
+      const cancelled = result?.canceled ?? result?.cancelled ?? false;
+      const uri = result?.assets?.[0]?.uri ?? result?.uri;
+      if (!cancelled && uri) {
+        // support both new and old structures
+        const asset = result?.assets?.[0] ?? { uri: uri, fileName: undefined, type: undefined };
+        setImages((prev) => [...prev, uri]);
         // Save file info for upload
         setSelectedFile({
-          uri: asset.uri,
-          name: asset.fileName || asset.uri.split('/').pop() || 'photo.jpg',
+          uri: uri,
+          name: asset.fileName || uri.split('/').pop() || 'photo.jpg',
           type: asset.type ? `image/${asset.type}` : 'image/jpeg',
         } as any);
       }

@@ -166,19 +166,22 @@ export function EditProduct({ route }: EditProductProps) {
 
   const handleImageUpload = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const granted = permission?.granted ?? (permission?.status === 'granted');
+      if (!granted) {
         Alert.alert('Quyền truy cập bị từ chối', 'Vui lòng cho phép truy cập ảnh');
         return;
       }
+
       const result: any = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaType.Images,
         quality: 0.7,
       });
-      if (result && !result.cancelled) {
-        // Newer expo returns assets array
-        const uri = result?.assets?.[0]?.uri || result?.uri;
-        if (uri) setImages((prev) => [...prev, uri]);
+
+      const cancelled = result?.canceled ?? result?.cancelled ?? false;
+      const uri = result?.assets?.[0]?.uri ?? result?.uri;
+      if (!cancelled && uri) {
+        setImages((prev) => [...prev, uri]);
       }
     } catch (err) {
       console.error('Image picker error', err);
