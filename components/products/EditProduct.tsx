@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
+import * as ImagePicker from 'expo-image-picker';
 import productService from '@/services/productService';
 import categoryService, { CategoryResponse } from '@/services/categoryService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -163,10 +164,26 @@ export function EditProduct({ route }: EditProductProps) {
     }
   };
 
-  const handleImageUpload = () => {
-    const mockImage =
-      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop';
-    setImages((prev) => [...prev, mockImage]);
+  const handleImageUpload = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Quyền truy cập bị từ chối', 'Vui lòng cho phép truy cập ảnh');
+        return;
+      }
+      const result: any = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+      });
+      if (result && !result.cancelled) {
+        // Newer expo returns assets array
+        const uri = result?.assets?.[0]?.uri || result?.uri;
+        if (uri) setImages((prev) => [...prev, uri]);
+      }
+    } catch (err) {
+      console.error('Image picker error', err);
+      Alert.alert('Lỗi', 'Không thể chọn ảnh');
+    }
   };
 
   const removeImage = (index: number) => {
