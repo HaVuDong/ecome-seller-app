@@ -172,7 +172,7 @@ export function EditProduct({ route }: EditProductProps) {
         return;
       }
       const result: any = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaType.Images,
         quality: 0.7,
       });
       if (result && !result.cancelled) {

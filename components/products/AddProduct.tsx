@@ -109,7 +109,7 @@ export function AddProduct() {
       }
       const ImagePicker = await import('expo-image-picker');
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaType.Images,
         quality: 0.8,
         allowsEditing: true,
       });
